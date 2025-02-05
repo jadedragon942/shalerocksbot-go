@@ -4,24 +4,33 @@
 
 ```
 ;addpoint <username>
+
 ;ap <username>
 
 ;rmpoint <username>
+
 ;rp <username>
 
 ;ask this or that
 
 ;badge -add -name="your_badge" -date="today"
+
 ;badge -add -name="your_badge" -date="39 days ago"
+
 ;badge -delete -name="your_badge"
+
 ;badge
 
 ;tell <username> <message>
+
 ;weather <place>
 
 (duck hunt)
+
 ;bef
+
 ;bang
+
 ;huntscore
 ```
 
@@ -36,5 +45,5 @@ go run main.go
 
 # SECURITY
 
-This code has been scanned by gosec.
+This code has been scanned by gosec and reviewed by the author for vulnerabilities.
 

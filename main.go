@@ -20,7 +20,8 @@ import (
 	irc "github.com/thoj/go-ircevent"
 )
 
-const version = "0.02"
+const debug = false
+const version = "0.03"
 
 /*********************************************************************
  * 1) Types, Structures, and Global Variables
@@ -300,20 +301,29 @@ func fetchWeatherSummary3(location string) (string, error) {
 /*********************************************************************
  * 4) Animal Hunt Logic
  *********************************************************************/
+const brown = "\x0305"
+const normal = "\x0f"
+const bold  = "\x02"
+const pink = "\x0313"
+
 var possibleAnimals = []struct {
 	name  string
 	sound string
 }{
-	{"duck", "quacks in the distance"},
-	{"pig", "oinks loudly"},
-	{"seal", "barks on the shore"},
-	{"mouse", "squeaks in the corner"},
-	{"shark", "lurks beneath the surface"},
+	{"duck", brown+"(o)<  ・゜゜・。。・゜゜HONK"+normal},
+	{"pig", brown+"~~(_ _)^"+pink+":"+brown+" OINK" + normal},
+	{"seal", bold+"(ᵔᴥᵔ) BARK"+normal},
+	{"mouse", brown+"<:3)~ SQEEK"+normal},
+	{"shark", bold+"____/\\_______\\o/___ AHHHH! SHARK"+normal},
 }
+
 
 func scheduleNextAnimal() {
 	go func() {
-		delay := rand.Intn(271) + 30 // 30..300
+		delay := rand.Intn(3180) + 360 // 30..300
+		if debug {
+			delay = 8 // 8 seconds when in debug
+		}
 		time.Sleep(time.Duration(delay) * time.Second)
 		spawnAnimal()
 	}()
@@ -333,7 +343,7 @@ func spawnAnimal() {
 		spawned: true,
 		claimed: false,
 	}
-	bot.Privmsg(channel, fmt.Sprintf("A %s %s! Type ;bef or ;bang to act.", chosen.name, chosen.sound))
+	bot.Privmsg(channel, fmt.Sprintf("%s", chosen.sound))
 }
 
 func recordAnimalHunt(nick, animal, action string) error {
