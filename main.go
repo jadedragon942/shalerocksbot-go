@@ -250,8 +250,6 @@ func fetchWeatherSummary3(location string) (string, error) {
 	}
 
 	// 3) Call OpenWeatherMap One Call 3.0 API
-	//    We request current weather only, so we can use `&exclude=minutely,hourly,daily,alerts`
-	//    if we only want "current" data. You can remove that param if you want forecasts.
 	oneCallURL := fmt.Sprintf(
 		"https://api.openweathermap.org/data/3.0/onecall?lat=%f&lon=%f&exclude=minutely,hourly,daily,alerts&units=imperial&appid=%s",
 		lat, lon, apiKey,
@@ -289,7 +287,7 @@ func fetchWeatherSummary3(location string) (string, error) {
 		return "", fmt.Errorf("no weather data in OWM response for %q", location)
 	}
 
-	// 5) Build a summary. You could display lat/lon or the original `location` string, etc.
+	// 5) Build a summary
 	desc := owmData.Current.Weather[0].Description
 	tempF := owmData.Current.Temp
 	summary := fmt.Sprintf("It's %.1f°F with %s in %s (%.4f, %.4f).",
@@ -303,24 +301,23 @@ func fetchWeatherSummary3(location string) (string, error) {
  *********************************************************************/
 const brown = "\x0305"
 const normal = "\x0f"
-const bold  = "\x02"
+const bold = "\x02"
 const pink = "\x0313"
 
 var possibleAnimals = []struct {
 	name  string
 	sound string
 }{
-	{"duck", brown+"(o)<  ・゜゜・。。・゜゜HONK"+normal},
-	{"pig", brown+"~~(_ _)^"+pink+":"+brown+" OINK" + normal},
-	{"seal", bold+"(ᵔᴥᵔ) BARK"+normal},
-	{"mouse", brown+"<:3)~ SQEEK"+normal},
-	{"shark", bold+"____/\\_______\\o/___ AHHHH! SHARK"+normal},
+	{"duck", brown + "(o)<  ・゜゜・。。・゜゜HONK" + normal},
+	{"pig", brown + "~~(_ _)^" + pink + ":" + brown + " OINK" + normal},
+	{"seal", bold + "(ᵔᴥᵔ) BARK" + normal},
+	{"mouse", brown + "<:3)~ SQEEK" + normal},
+	{"shark", bold + "____/\\_______\\o/___ AHHHH! SHARK" + normal},
 }
-
 
 func scheduleNextAnimal() {
 	go func() {
-		delay := rand.Intn(3180) + 360 // 30..300
+		delay := rand.Intn(3180) + 360 // 30..300 minutes in seconds, or 6..53 minutes?
 		if debug {
 			delay = 8 // 8 seconds when in debug
 		}
@@ -651,7 +648,6 @@ func main() {
 					} else {
 						bot.Privmsg(channel, summary)
 					}
-
 				}
 			}()
 			return
@@ -700,11 +696,31 @@ func main() {
 			} else {
 				action = "shoot"
 			}
+
+			// Record in DB
 			if err := recordAnimalHunt(userNick, theAnimal, action); err != nil {
 				log.Printf("[ERROR] recordAnimalHunt failed: %v", err)
 				bot.Privmsg(channel, fmt.Sprintf("Database error: %v", err))
 				return
 			}
+
+			// SPECIAL REVERSE LOGIC FOR SHARKS
+			if theAnimal == "shark" {
+				if action == "shoot" {
+					// User shot the shark, save a swimmer +1 point
+					newVal, _ := addPoint(userNick, userNick)
+					bot.Privmsg(channel,
+						fmt.Sprintf("You shot a shark and saved a swimmer! Gain one point. (Now at %d points.)", newVal))
+				} else {
+					// User befriended the shark, the swimmer dies -1 point
+					newVal, _ := removePoint(userNick, userNick)
+					bot.Privmsg(channel,
+						fmt.Sprintf("You befriend the shark but the swimmer gets it! Lose a point. (Now at %d points.)", newVal))
+				}
+				return
+			}
+
+			// NORMAL LOGIC FOR NON-SHARKS
 			befCount, shotCount, _ := getHuntStats(userNick)
 			if action == "befriend" {
 				bot.Privmsg(channel,
@@ -793,8 +809,6 @@ func main() {
 		// 6) Badge Commands
 		cmd, parseErr := parseBadgeCommand(msg)
 		if parseErr != nil {
-			// not a badge command
-			bot.Privmsg(channel, fmt.Sprintf("%s: not a badge command", userNick))
 			return
 		}
 		switch cmd.action {
