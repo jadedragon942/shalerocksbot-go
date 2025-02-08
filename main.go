@@ -710,26 +710,27 @@ func main() {
 					// User shot the shark, save a swimmer +1 point
 					newVal, _ := addPoint(userNick, userNick)
 					bot.Privmsg(channel,
-						fmt.Sprintf("You shot a shark and saved a swimmer! Gain one point. (Now at %d points.)", newVal))
+						fmt.Sprintf("You shot a shark and saved a swimmer! Points: %d", newVal))
 				} else {
 					// User befriended the shark, the swimmer dies -1 point
 					newVal, _ := removePoint(userNick, userNick)
 					bot.Privmsg(channel,
-						fmt.Sprintf("You befriend the shark but the swimmer gets it! Lose a point. (Now at %d points.)", newVal))
+						fmt.Sprintf("You befriend the shark but the swimmer gets it! Points: %d", newVal))
 				}
 				return
 			}
 
 			// NORMAL LOGIC FOR NON-SHARKS
 			befCount, shotCount, _ := getHuntStats(userNick)
+			totalPoints := befCount + shotCount
 			if action == "befriend" {
 				bot.Privmsg(channel,
-					fmt.Sprintf("%s befriended the %s! You have now befriended %d and shot %d.",
-						userNick, theAnimal, befCount, shotCount))
+					fmt.Sprintf("%s befriended the %s! Total points: %d (befriended: %d, shot: %d)",
+						userNick, theAnimal, totalPoints, befCount, shotCount))
 			} else {
 				bot.Privmsg(channel,
-					fmt.Sprintf("%s shot the %s! You have now shot %d and befriended %d.",
-						userNick, theAnimal, shotCount, befCount))
+					fmt.Sprintf("%s shot the %s! Total points: %d (befriended: %d, shot: %d)",
+						userNick, theAnimal, totalPoints, befCount, shotCount))
 			}
 			return
 		}
@@ -741,8 +742,10 @@ func main() {
 				bot.Privmsg(channel, fmt.Sprintf("Error fetching your hunt score: %v", err))
 				return
 			}
+			totalPoints := befCount + shotCount
 			bot.Privmsg(channel,
-				fmt.Sprintf("%s's hunt stats: befriended %d, shot %d.", userNick, befCount, shotCount))
+				fmt.Sprintf("%s's total hunt points: %d (befriended: %d, shot: %d)",
+					userNick, totalPoints, befCount, shotCount))
 			return
 		}
 
