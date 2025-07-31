@@ -586,7 +586,8 @@ func main() {
 
 	bot = irc.IRC(nick, user)
 	bot.Server = server
-	bot.Debug = true
+	bot.Debug = false
+	bot.VerboseCallbackHandler = false
 
 	log.Println("[DEBUG] Attempting to connect to IRC server...")
 	if err := bot.Connect(bot.Server); err != nil {
@@ -594,10 +595,13 @@ func main() {
 	}
 
 	// IRC Callbacks
+
+/*
 	bot.AddCallback("*", func(e *irc.Event) {
 		log.Printf("[IRC EVENT] Code: %s | Source: %s | Args: %v | Raw: %s",
 			e.Code, e.Source, e.Arguments, e.Raw)
 	})
+*/
 	bot.AddCallback("001", func(e *irc.Event) {
 		log.Printf("[DEBUG] Received RPL_WELCOME: %s", e.Raw)
 		if nickServPass != "" {
