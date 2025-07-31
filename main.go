@@ -885,29 +885,8 @@ func main() {
 		}
 	})
 
-	// 8) Start webserver (for koyeb.com health check).
-	startHealthCheckServer()
-
 	// 9) Main loop
 	log.Println("[DEBUG] Starting IRC event loop.")
 	bot.Loop()
 }
 
-// startHealthCheckServer starts a simple HTTP server for health checks
-func startHealthCheckServer() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	log.Printf("Starting health check server on :8000")
-	go func() {
-		if err := http.ListenAndServe(":8000", nil); err != nil {
-			log.Printf("Health check server error: %v", err)
-		}
-	}()
-}
