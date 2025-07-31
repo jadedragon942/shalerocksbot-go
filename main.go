@@ -17,7 +17,7 @@ import (
 )
 
 const debug = false
-const version = "0.03"
+const version = "0.04"
 
 /*********************************************************************
  * 1) Types, Structures, and Global Variables
@@ -121,6 +121,179 @@ func daysSince(dateStr string) int {
 		return 0
 	}
 	return int(diff.Hours() / 24)
+}
+
+/*********************************************************************
+ * 3) Herald System Functions
+ *********************************************************************/
+/*********************************************************************
+ * 3) Herald System Functions (Updated)
+ *********************************************************************/
+
+type heraldCommand struct {
+	action     string // "add", "delete", "list", or "show"
+	id         int    // for delete command
+	message    string // for add command
+	targetNick string // for -nick parameter (optional)
+}
+
+func parseHeraldCommand(message string) (*heraldCommand, error) {
+	if !strings.HasPrefix(message, ";herald") {
+		return nil, fmt.Errorf("not a ;herald command")
+	}
+
+	// ;herald -add "message here" [-nick username]
+	if strings.Contains(message, "-add") {
+		msgRegex := regexp.MustCompile(`-add\s+"([^"]+)"`)
+		msgMatch := msgRegex.FindStringSubmatch(message)
+		if len(msgMatch) < 2 {
+			return nil, fmt.Errorf("missing message for add (use quotes)")
+		}
+
+		// Check for optional -nick parameter
+		nickRegex := regexp.MustCompile(`-nick\s+(\S+)`)
+		nickMatch := nickRegex.FindStringSubmatch(message)
+
+		var targetNick string
+		if len(nickMatch) >= 2 {
+			targetNick = nickMatch[1]
+		}
+
+		return &heraldCommand{
+			action:     "add",
+			message:    msgMatch[1],
+			targetNick: targetNick,
+		}, nil
+	}
+
+	// ;herald -delete <id> [-nick username]
+	if strings.Contains(message, "-delete") {
+		deleteRegex := regexp.MustCompile(`-delete\s+(\d+)`)
+		deleteMatch := deleteRegex.FindStringSubmatch(message)
+		if len(deleteMatch) < 2 {
+			return nil, fmt.Errorf("missing ID for delete")
+		}
+		id, err := strconv.Atoi(deleteMatch[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid ID for delete")
+		}
+
+		// Check for optional -nick parameter
+		nickRegex := regexp.MustCompile(`-nick\s+(\S+)`)
+		nickMatch := nickRegex.FindStringSubmatch(message)
+
+		var targetNick string
+		if len(nickMatch) >= 2 {
+			targetNick = nickMatch[1]
+		}
+
+		return &heraldCommand{
+			action:     "delete",
+			id:         id,
+			targetNick: targetNick,
+		}, nil
+	}
+
+	// ;herald -list [-nick username] (or just ;herald)
+	nickRegex := regexp.MustCompile(`-nick\s+(\S+)`)
+	nickMatch := nickRegex.FindStringSubmatch(message)
+
+	var targetNick string
+	if len(nickMatch) >= 2 {
+		targetNick = nickMatch[1]
+	}
+
+	return &heraldCommand{
+		action:     "list",
+		targetNick: targetNick,
+	}, nil
+}
+
+func addHerald(nick, message string) (int, error) {
+	result, err := db.Exec(`
+		INSERT INTO heralds (nick, message, created_date)
+		VALUES (?, ?, datetime('now'))
+	`, nick, message)
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(id), nil
+}
+
+func deleteHerald(nick string, id int) (bool, error) {
+	result, err := db.Exec(`
+		DELETE FROM heralds 
+		WHERE id = ? AND nick = ?
+	`, id, nick)
+	if err != nil {
+		return false, err
+	}
+
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+
+	return affected > 0, nil
+}
+
+func listHeralds(nick string) ([]string, error) {
+	rows, err := db.Query(`
+		SELECT id, message 
+		FROM heralds 
+		WHERE nick = ? 
+		ORDER BY id
+	`, nick)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var heralds []string
+	for rows.Next() {
+		var id int
+		var message string
+		if err := rows.Scan(&id, &message); err != nil {
+			continue
+		}
+		heralds = append(heralds, fmt.Sprintf("#%d: %s", id, message))
+	}
+
+	return heralds, nil
+}
+
+func getRandomHerald(nick string) (string, error) {
+	rows, err := db.Query(`
+		SELECT message 
+		FROM heralds 
+		WHERE nick = ?
+	`, nick)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	var messages []string
+	for rows.Next() {
+		var message string
+		if err := rows.Scan(&message); err != nil {
+			continue
+		}
+		messages = append(messages, message)
+	}
+
+	if len(messages) == 0 {
+		return "", nil
+	}
+
+	// Return a random herald message
+	return messages[rand.Intn(len(messages))], nil
 }
 
 /*********************************************************************
@@ -395,6 +568,20 @@ func main() {
 		log.Fatalf("[FATAL] Failed to create user_points table: %v", err)
 	}
 
+	// 5) Create heralds table
+	createHeraldsTableSQL := `
+	CREATE TABLE IF NOT EXISTS heralds (
+	    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+	    nick         TEXT NOT NULL,
+	    message      TEXT NOT NULL,
+	    created_date TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
+	`
+	log.Println("[DEBUG] Ensuring heralds table exists.")
+	if _, err := db.Exec(createHeraldsTableSQL); err != nil {
+		log.Fatalf("[FATAL] Failed to create heralds table: %v", err)
+	}
+
 	// IRC Config
 	nickServPass := os.Getenv("NICKSERV_PASS")
 	nick := os.Getenv("NICKNAME")
@@ -443,6 +630,28 @@ func main() {
 
 		// Start the animal-hunt cycle
 		scheduleNextAnimal()
+	})
+
+	// Handle JOIN events for herald messages
+	bot.AddCallback("JOIN", func(e *irc.Event) {
+		joiningNick := e.Nick
+
+		// Don't herald the bot itself
+		if joiningNick == bot.GetNick() {
+			return
+		}
+
+		// Get a random herald message for this user
+		heraldMsg, err := getRandomHerald(joiningNick)
+		if err != nil {
+			log.Printf("[ERROR] getRandomHerald: %v", err)
+			return
+		}
+
+		// If they have a herald message, display it
+		if heraldMsg != "" {
+			bot.Privmsg(channel, heraldMsg)
+		}
 	})
 
 	// Main PRIVMSG callback
@@ -641,7 +850,89 @@ func main() {
 			return
 		}
 
-		// 6) Badge Commands
+		// 6) Herald Commands (Updated section)
+		heraldCmd, heraldErr := parseHeraldCommand(msg)
+		if heraldErr == nil {
+			switch heraldCmd.action {
+			case "add":
+				// Determine which nick to add the herald for
+				targetNick := userNick // Default to the user who sent the command
+				if heraldCmd.targetNick != "" {
+					targetNick = heraldCmd.targetNick
+				}
+
+				id, err := addHerald(targetNick, heraldCmd.message)
+				if err != nil {
+					log.Printf("[ERROR] addHerald: %v", err)
+					bot.Privmsg(channel, fmt.Sprintf("Failed to add herald: %v", err))
+					return
+				}
+
+				if heraldCmd.targetNick != "" {
+					bot.Privmsg(channel,
+						fmt.Sprintf("%s added herald #%d for %s: %s", userNick, id, targetNick, heraldCmd.message))
+				} else {
+					bot.Privmsg(channel,
+						fmt.Sprintf("%s added herald #%d: %s", userNick, id, heraldCmd.message))
+				}
+
+			case "delete":
+				// Determine which nick to delete the herald from
+				targetNick := userNick // Default to the user who sent the command
+				if heraldCmd.targetNick != "" {
+					targetNick = heraldCmd.targetNick
+				}
+
+				deleted, err := deleteHerald(targetNick, heraldCmd.id)
+				if err != nil {
+					log.Printf("[ERROR] deleteHerald: %v", err)
+					bot.Privmsg(channel, fmt.Sprintf("Failed to delete herald: %v", err))
+					return
+				}
+
+				if deleted {
+					if heraldCmd.targetNick != "" {
+						bot.Privmsg(channel,
+							fmt.Sprintf("%s deleted herald #%d for %s.", userNick, heraldCmd.id, targetNick))
+					} else {
+						bot.Privmsg(channel,
+							fmt.Sprintf("%s deleted herald #%d.", userNick, heraldCmd.id))
+					}
+				} else {
+					if heraldCmd.targetNick != "" {
+						bot.Privmsg(channel,
+							fmt.Sprintf("Herald #%d not found for %s.", heraldCmd.id, targetNick))
+					} else {
+						bot.Privmsg(channel,
+							fmt.Sprintf("Herald #%d not found for %s.", heraldCmd.id, userNick))
+					}
+				}
+
+			case "list":
+				// Determine which nick to list heralds for
+				targetNick := userNick // Default to the user who sent the command
+				if heraldCmd.targetNick != "" {
+					targetNick = heraldCmd.targetNick
+				}
+
+				heralds, err := listHeralds(targetNick)
+				if err != nil {
+					log.Printf("[ERROR] listHeralds: %v", err)
+					bot.Privmsg(channel, fmt.Sprintf("Failed to list heralds: %v", err))
+					return
+				}
+
+				if len(heralds) == 0 {
+					bot.Privmsg(channel, fmt.Sprintf("%s has no heralds.", targetNick))
+				} else {
+					bot.Privmsg(channel,
+						fmt.Sprintf("%s's heralds: %s", targetNick, strings.Join(heralds, " | ")))
+				}
+			}
+			return
+		}
+
+		// 7) Badge Commands
 		cmd, parseErr := parseBadgeCommand(msg)
 		if parseErr != nil {
 			return
