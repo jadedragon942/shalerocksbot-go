@@ -781,12 +781,12 @@ func main() {
 			strings.HasPrefix(cmdLower, ";ap") || strings.HasPrefix(cmdLower, ";rp") {
 			parts := strings.SplitN(msg, " ", 2)
 			if len(parts) < 2 {
-				bot.Privmsg(channel, "Usage: ;addpoint <username>")
+				bot.Privmsg(channel, "Usage: ;addpoint <username> OR ;rmpoint <username>")
 				return
 			}
 			target := strings.TrimSpace(parts[1])
 			if target == "" {
-				bot.Privmsg(channel, "Usage: ;addpoint <username>")
+				bot.Privmsg(channel, "Usage: ;addpoint <username> OR ;rmpoint <username>")
 				return
 			}
 
