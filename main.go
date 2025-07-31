@@ -16,6 +16,7 @@ import (
 	irc "github.com/thoj/go-ircevent"
 )
 
+// Debug mode
 const debug = false
 const version = "0.04"
 
@@ -932,7 +933,31 @@ func main() {
 			return
 		}
 
-		// 7) Badge Commands
+		// 7) Reset Badge Command
+		if strings.HasPrefix(strings.ToLower(msg), ";resetbadge") {
+			targetNick := e.Nick
+
+			// Reset the Sobriety badge to today's date
+			res, dbErr := db.Exec(`
+				UPDATE badges SET date = datetime('now') WHERE name = 'Sobriety' AND nick = ?
+			`, targetNick)
+			if dbErr != nil {
+				log.Printf("[ERROR] Reset badge: %v", dbErr)
+				bot.Privmsg(channel, fmt.Sprintf("Failed to reset badge: %v", dbErr))
+				return
+			}
+			affected, _ := res.RowsAffected()
+			if affected == 0 {
+				bot.Privmsg(channel,
+					fmt.Sprintf("No Sobriety badge found for %s.", targetNick))
+			} else {
+				bot.Privmsg(channel,
+					fmt.Sprintf("%s reset %s's Sobriety badge to day 1.", userNick, targetNick))
+			}
+			return
+		}
+
+		// 8) Badge Commands
 		cmd, parseErr := parseBadgeCommand(msg)
 		if parseErr != nil {
 			return
