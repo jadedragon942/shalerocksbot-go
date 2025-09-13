@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Build the Go binary (static)
-RUN CGO_ENABLED=0 GOOS=linux go build -o app .
+RUN CGO_ENABLED=1 GOOS=linux go build -o app .
 
 # Final minimal image
 FROM alpine:latest
