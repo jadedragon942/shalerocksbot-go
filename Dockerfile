@@ -10,6 +10,8 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
+RUN apk add gcc musl-dev
+
 # Build the Go binary (static)
 RUN CGO_ENABLED=1 GOOS=linux go build -o app .
 
