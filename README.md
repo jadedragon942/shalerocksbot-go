@@ -47,3 +47,4 @@ go run main.go
 
 This code has been scanned by gosec and reviewed by the author for vulnerabilities.
 
+This README was hand-written without AI assistance.
