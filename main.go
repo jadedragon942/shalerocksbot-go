@@ -499,8 +499,6 @@ func removePoint(fromNick, toNick string) (int, error) {
  *********************************************************************/
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	var err error
 	log.Println("[DEBUG] Opening/creating badges.db SQLite database.")
 	db, err = sql.Open("sqlite3", "badges.db")
