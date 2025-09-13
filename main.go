@@ -588,7 +588,7 @@ func main() {
 		nick = "jadebot"
 	}
 	user := nick
-	server := "irc.snoonet.org:6667"
+	server := os.Getenv("SERVER") // "irc.snoonet.org:6667"
 	channel = os.Getenv("CHANNEL")
 	if channel == "" {
 		channel = "#jadebotdev"
