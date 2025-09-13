@@ -602,6 +602,12 @@ func main() {
 	bot.Debug = false
 	bot.VerboseCallbackHandler = false
 
+    bot.UseTLS = true
+    bot.TLSConfig = &tls.Config{
+        InsecureSkipVerify: true,
+    }
+
+
 	log.Println("[DEBUG] Attempting to connect to IRC server...")
 	if err := bot.Connect(bot.Server); err != nil {
 		log.Fatalf("[FATAL] Failed to connect to IRC server: %v", err)
