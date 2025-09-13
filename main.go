@@ -502,7 +502,7 @@ func removePoint(fromNick, toNick string) (int, error) {
 func main() {
 	var err error
 	log.Println("[DEBUG] Opening/creating badges.db SQLite database.")
-	db, err = sql.Open("sqlite3", "badges.db")
+	db, err = sql.Open("sqlite3", os.Getenv("DATABASE"))
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to open database: %v", err)
 	}
